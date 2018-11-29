@@ -1,0 +1,13 @@
+[run]
+branch = True
+source =
+    attrsbuilder
+
+[paths]
+source =
+   src/attrsbuilder
+   .tox/*/lib/python*/site-packages/attrsbuilder
+   .tox/pypy/site-packages/attrsbuilder
+
+[report]
+show_missing = True
