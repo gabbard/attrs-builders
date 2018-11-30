@@ -86,7 +86,9 @@ class _BuilderBuilder(object):
 
         for attribute in self._cls.__attrs_attrs__:
             if attribute.init:
-                lines.append(f"\tself.{attribute.name} = NOTHING")
+                # strip _ to match attrs constructor
+                lines.append("\tself.{attribute_public_name} = NOTHING"
+                             .format(attribute_public_name=attribute.name.lstrip('_')))
         # in case none of the attributes are initialized
         lines.append("\tpass")
 
@@ -121,8 +123,11 @@ class _BuilderBuilder(object):
 
         for attribute in self._cls.__attrs_attrs__:
             if attribute.init:
-                lines.append("\tself.{attribute_name} = getattr(source_object, '{attribute_name}')"
-                             .format(attribute_name=attribute.name))
+                lines.append("\tself.{attribute_public_name} = getattr(source_object, "
+                             "'{attribute_name}')"
+                             .format(
+                    attribute_public_name=attribute.name.lstrip("_"),
+                    attribute_name=attribute.name))
         lines.append("\treturn self")
 
         script = "\n".join(lines)
@@ -155,14 +160,16 @@ class _BuilderBuilder(object):
             # TODO: handle the case of defaults which are functions
             for attribute in self._cls.__attrs_attrs__:
                 if attribute.init:
-                    builder_att_val = getattr(builder_self, attribute.name)
+                    attribute_public_name = attribute.name.lstrip("_")
+                    builder_att_val = getattr(builder_self, attribute_public_name)
                     if builder_att_val is not NOTHING:
                         # this will pass only if the user explicitly set it. Otherwise,
                         # we don't specify it so that the attr class's default will be used
-                        kw_args[attribute.name] = builder_att_val
+                        kw_args[attribute_public_name] = builder_att_val
             return self._cls(**kw_args)
 
-        lines = ["def build(self):", "\treturn {self._cls.__qualname__}("]
+        lines = ["def build(self):",
+                 "\treturn {class_name}(".format(class_name={self._cls.__qualname__})]
         first = True
         for attribute in self._cls.__attrs_attrs__:
             if attribute.init:
@@ -172,7 +179,11 @@ class _BuilderBuilder(object):
                     initial_comma = ""
                 first = False
 
-                lines.append(f"\t\t{initial_comma}{attribute.name} = self.{attribute.name}")
+                attribute_public_name = attribute.name.lstrip("_")
+                lines.append(("\t\t{initial_comma}{attribute_public_name} = "
+                              "self.{attribute_public_name}")
+                             .format(initial_comma=initial_comma,
+                                     attribute_public_name=attribute_public_name))
         lines.append("\t\t)")
 
         #local_variables = {}
@@ -201,7 +212,9 @@ class _BuilderBuilder(object):
                         first = False
                     else:
                         ret.append(", ")
-                    ret.extend((attribute.name, "=", repr(getattr(self, attribute.name))))
+                    attribute_public_name = attribute.name.lstrip("_")
+                    ret.extend((attribute_public_name, "=",
+                                repr(getattr(self, attribute_public_name))))
             ret.append(")")
             return "".join(ret)
         return __repr__
