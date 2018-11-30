@@ -28,3 +28,16 @@ class TestDirectSetOfFields(object):
         builder.y = "bar"
         assert A(x="foo", y="bar") == builder.build()
 
+
+class TestInitializeFromExiting(object):
+    def test_initialize_from_existing(self):
+        @generate_builder
+        @attrs
+        class A:
+            x = attrib()
+            y = attrib()
+
+        original = A(x=5, y=10)
+        builder = A.builder().initialize_from(original)
+        builder.y = -2
+        assert A(x=5, y=-2) == builder.build()
