@@ -11,3 +11,5 @@ __email__ = "ryan.gabbard@gmail.com"
 
 __license__ = "MIT"
 __copyright__ = "Copyright (c) 2018 Ryan Gabbard"
+
+from attrsbuilders._builders import generate_builder

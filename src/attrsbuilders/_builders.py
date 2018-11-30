@@ -3,6 +3,8 @@ from __future__ import absolute_import, division, print_function
 import hashlib
 import linecache
 
+from attr import NOTHING
+
 
 class _BuilderBuilder(object):
     def __init__(self, cls):
@@ -18,6 +20,7 @@ class _BuilderBuilder(object):
 
         if not builder_cls:
             builder_cls = type(cls)("Builder", (), {})
+            builder_cls.__qualname__ = f"{cls.__qualname__}.{self._builder_name}"
             setattr(cls, self._builder_name, builder_cls)
 
         self._patch_builder(builder_cls)
@@ -45,12 +48,19 @@ class _BuilderBuilder(object):
         sha1.update(repr("foo").encode("utf-8"))
         unique_filename = "<attrsbuilder generated init {0}>".format(sha1.hexdigest())
 
-        script = "\n".join(["def __init__(self):",
-                  "\tprint('hello world')"])
+        lines = ["def __init__(self):"]
+
+        for attribute in self._cls.__attrs_attrs__:
+            if attribute.init:
+                lines.append(f"\tself.{attribute.name} = NOTHING")
+        # in case none of the attributes are initialized
+        lines.append("\tpass")
+
+        script = "\n".join(lines)
 
         local_variables = {}
         bytecode = compile(script, unique_filename, "exec")
-        eval(bytecode, {}, local_variables)
+        eval(bytecode, {"NOTHING": NOTHING}, local_variables)
 
         # In order of debuggers like PDB being able to step through the code,
         # we add a fake linecache entry.
@@ -71,17 +81,38 @@ class _BuilderBuilder(object):
         sha1.update(repr("foobuild").encode("utf-8"))
         unique_filename = "<attrsbuilder generated build {0}>".format(sha1.hexdigest())
 
-        script = "\n".join([
-                "def build(self):",
-                "\tprint('goodbye world')",
-                "\treturn 5"])
+        def build(builder_self):
+            kw_args = {}
+            # TODO: handle the case of defaults which are functions
+            for attribute in self._cls.__attrs_attrs__:
+                if attribute.init:
+                    builder_att_val = getattr(builder_self, attribute.name)
+                    if builder_att_val is not NOTHING:
+                        # this will pass only if the user explicitly set it. Otherwise,
+                        # we don't specify it so that the attr class's default will be used
+                        kw_args[attribute.name] = builder_att_val
+            return self._cls(**kw_args)
 
-        local_variables = {}
-        bytecode = compile(script, unique_filename, "exec")
-        eval(bytecode, {}, local_variables)
+        lines = ["def build(self):", "\treturn {self._cls.__qualname__}("]
+        first = True
+        for attribute in self._cls.__attrs_attrs__:
+            if attribute.init:
+                if not first:
+                    initial_comma = ", "
+                else:
+                    initial_comma = ""
+                first = False
+
+                lines.append(f"\t\t{initial_comma}{attribute.name} = self.{attribute.name}")
+        lines.append("\t\t)")
+
+        #local_variables = {}
+        #bytecode = compile(script, unique_filename, "exec")
+        #eval(bytecode, {}, local_variables)
 
         # In order of debuggers like PDB being able to step through the code,
         # we add a fake linecache entry.
+        script = "\n".join(lines)
         linecache.cache[unique_filename] = (
             len(script),
             None,
@@ -89,7 +120,6 @@ class _BuilderBuilder(object):
             unique_filename,
         )
 
-        build = local_variables["build"]
         return build
 
     def _make_builder_method(self):
