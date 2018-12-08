@@ -272,6 +272,9 @@ def generate_builder(
         maybe_cls=None
 ):
     def wrap(cls):
+        if not hasattr(cls, '__attrs_attrs__'):
+            raise RuntimeError("@generate_builder can only be applied to attrs classes")
+
         builder_builder = _BuilderBuilder(cls)
         if getattr(cls, "__class__", None) is None:
             raise TypeError("attrsbuilder only works with new-style classes.")
