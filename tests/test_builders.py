@@ -55,3 +55,15 @@ class TestInitializeFromExistingNonPublic(object):
         builder = A.builder().initialize_from(original)
         builder.y = -2
         assert A(x=5, y=-2) == builder.build()
+
+
+class TestExceptionIfNonAttrs(object):
+    def test_exception_if_non_attrs(self):
+        with pytest.raises(RuntimeError,
+                           match="@generate_builder can only "
+                                 "be applied to attrs classes"):
+            @generate_builder
+            class A:
+                _x = attrib()
+                _y = attrib()
+
